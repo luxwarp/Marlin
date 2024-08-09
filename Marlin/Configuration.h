@@ -1278,7 +1278,7 @@
 
 #define LIMITED_MAX_ACCEL_EDITING     // Limit edit via M201 or LCD to DEFAULT_MAX_ACCELERATION * 2
 #if ENABLED(LIMITED_MAX_ACCEL_EDITING)
-  #define MAX_ACCEL_EDIT_VALUES       { 1000, 1000, 200, 6000 } // ...or, set your own edit limits
+  #define MAX_ACCEL_EDIT_VALUES       { 1500, 1500, 400, 6000 } // ...or, set your own edit limits
 #endif
 
 /**
@@ -1329,7 +1329,7 @@
  *   https://blog.kyneticcnc.com/2018/10/computing-junction-deviation-for-marlin.html
  */
 #if DISABLED(CLASSIC_JERK)
-  #define JUNCTION_DEVIATION_MM 0.1 // (mm) Distance from real junction edge
+  #define JUNCTION_DEVIATION_MM 0.05 // (mm) Distance from real junction edge
   #define JD_HANDLE_SMALL_SEGMENTS    // Use curvature estimation instead of just the junction angle
                                       // for small segments (< 1mm) with large junction angles (> 135°).
 #endif
@@ -1342,7 +1342,7 @@
  *
  * See https://github.com/synthetos/TinyG/wiki/Jerk-Controlled-Motion-Explained
  */
-//#define S_CURVE_ACCELERATION
+#define S_CURVE_ACCELERATION
 
 //===========================================================================
 //============================= Z Probe Options =============================
