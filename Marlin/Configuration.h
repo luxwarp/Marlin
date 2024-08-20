@@ -700,9 +700,9 @@
     #define DEFAULT_Kd_LIST { 114.00, 114.00 }
   #else
     //PIDTemp auto tune values
-    #define DEFAULT_Kp 17.80
-    #define DEFAULT_Ki 1.33
-    #define DEFAULT_Kd 59.6
+    #define DEFAULT_Kp 17.41
+    #define DEFAULT_Ki 3.43
+    #define DEFAULT_Kd 21.91
   #endif
 #else
   #define BANG_MAX 255    // Limit hotend current while in bang-bang mode; 255=full current
@@ -1249,7 +1249,7 @@
  * Override with M92 (when enabled below)
  *                                      X, Y, Z [, I [, J [, K...]]], E0 [, E1[, E2...]]
  */
-#define DEFAULT_AXIS_STEPS_PER_UNIT   { 80.2, 79.54, 405, 98 }
+#define DEFAULT_AXIS_STEPS_PER_UNIT   { 80, 80, 405, 98 }
 
 /**
  * Enable support for M92. Disable to save at least ~530 bytes of flash.
@@ -1265,7 +1265,7 @@
 
 #define LIMITED_MAX_FR_EDITING        // Limit edit via M203 or LCD to DEFAULT_MAX_FEEDRATE * 2
 #if ENABLED(LIMITED_MAX_FR_EDITING)
-  #define MAX_FEEDRATE_EDIT_VALUES    { 400, 400, 200, 50 } // ...or, set your own edit limits
+  #define MAX_FEEDRATE_EDIT_VALUES    { 500, 500, 300, 100 } // ...or, set your own edit limits
 #endif
 
 /**
@@ -1300,7 +1300,7 @@
  * When changing speed and direction, if the difference is less than the
  * value set here, it may happen instantaneously.
  */
-//#define CLASSIC_JERK
+#define CLASSIC_JERK
 #if ENABLED(CLASSIC_JERK)
   #define DEFAULT_XJERK 10.0
   #define DEFAULT_YJERK 10.0
@@ -2419,7 +2419,7 @@
 #define PREHEAT_1_FAN_SPEED     0 // Value from 0 to 255
 
 #define PREHEAT_2_LABEL       "PETG"
-#define PREHEAT_2_TEMP_HOTEND 245
+#define PREHEAT_2_TEMP_HOTEND 255
 #define PREHEAT_2_TEMP_BED    80
 #define PREHEAT_2_TEMP_CHAMBER 0
 #define PREHEAT_2_FAN_SPEED     0 // Value from 0 to 255
