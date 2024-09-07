@@ -634,7 +634,7 @@
 
 // Below this temperature the heater will be switched off
 // because it probably indicates a broken thermistor wire.
-#define HEATER_0_MINTEMP   5
+#define HEATER_0_MINTEMP   1
 #define HEATER_1_MINTEMP   5
 #define HEATER_2_MINTEMP   5
 #define HEATER_3_MINTEMP   5
@@ -642,7 +642,7 @@
 #define HEATER_5_MINTEMP   5
 #define HEATER_6_MINTEMP   5
 #define HEATER_7_MINTEMP   5
-#define BED_MINTEMP        5
+#define BED_MINTEMP        1
 #define CHAMBER_MINTEMP    5
 
 // Above this temperature the heater will be switched off.
@@ -656,7 +656,7 @@
 #define HEATER_5_MAXTEMP 275
 #define HEATER_6_MAXTEMP 275
 #define HEATER_7_MAXTEMP 275
-#define BED_MAXTEMP      150
+#define BED_MAXTEMP      100
 #define CHAMBER_MAXTEMP  60
 
 /**
@@ -701,9 +701,9 @@
     #define DEFAULT_Kd_LIST { 114.00, 114.00 }
   #else
     //PIDTemp auto tune values
-    #define DEFAULT_Kp 17.41
-    #define DEFAULT_Ki 3.43
-    #define DEFAULT_Kd 21.91
+    #define DEFAULT_Kp 20.8
+    #define DEFAULT_Ki 1.8
+    #define DEFAULT_Kd 60.0
   #endif
 #else
   #define BANG_MAX 255    // Limit hotend current while in bang-bang mode; 255=full current
