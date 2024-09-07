@@ -22,21 +22,27 @@
 #pragma once
 
 /**
- * Conditionals_type.h
- * Internal defines that depend on Configurations and Pins but are not user-editable.
- * Define conditionals in this file if they depend on core/types.h.
+ * mmu2_state.h
  */
 
-#ifdef GITHUB_ACTIONS
-  // Extras for CI testing
-#endif
+#include <stdint.h>
 
-// If an axis's Homing Current differs from standard current...
-#define HAS_CURRENT_HOME(N) (N##_CURRENT_HOME > 0 && N##_CURRENT_HOME != N##_CURRENT)
+namespace MMU3 {
+  /**
+   * @brief status of mmu
+   *
+   * States of a printer with the MMU:
+   * - Active
+   * - Connecting
+   * - Stopped
+   *
+   * When the printer's FW starts, the MMU mode is either Stopped or NotResponding (based on user's preference).
+   * When the MMU successfully establishes communication, the state changes to Active.
+   */
+  enum class xState : uint_fast8_t {
+    Active,     //!< MMU has been detected, connected, communicates and is ready to be worked with.
+    Connecting, //!< MMU is connected but it doesn't communicate (yet). The user wants the MMU, but it is not ready to be worked with.
+    Stopped     //!< The user doesn't want the printer to work with the MMU. The MMU itself is not powered and does not work at all.
+  };
 
-// Does any axis have homing current?
-#define _OR_HAS_CURR_HOME(N) HAS_CURRENT_HOME(N) ||
-#if MAIN_AXIS_MAP(_OR_HAS_CURR_HOME) MAP(_OR_HAS_CURR_HOME, X2, Y2, Z2, Z3, Z4) 0
-  #define HAS_HOMING_CURRENT 1
-#endif
-#undef _OR_HAS_CURR_HOME
+} // MMU3

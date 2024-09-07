@@ -22,9 +22,15 @@
 #pragma once
 
 /**
- * Conditionals_post.h
+ * Conditionals-5-post.h
  * Internal defines that depend on Configurations and Pins but are not user-editable.
  */
+
+//========================================================
+// Get requirements for the benefit of IntelliSense, etc.
+//
+#include "MarlinConfigPre-5-post.h"
+//========================================================
 
 #ifdef GITHUB_ACTIONS
   // Extras for CI testing
@@ -50,7 +56,7 @@
 // Determine which type of 'EEPROM' is in use
 #if ENABLED(EEPROM_SETTINGS)
   // EEPROM type may be defined by compile flags, configs, HALs, or pins
-  // Set additional flags to let HALs choose in their Conditionals_post.h
+  // Set additional flags to let HALs choose in their Conditionals-5-post.h
   #if ANY(FLASH_EEPROM_EMULATION, SRAM_EEPROM_EMULATION, SDCARD_EEPROM_EMULATION, QSPI_EEPROM)
     #define USE_EMULATED_EEPROM 1
   #elif ANY(I2C_EEPROM, SPI_EEPROM)
@@ -2643,10 +2649,6 @@
 #endif
 
 // Thermal protection
-#if !HAS_HEATED_BED
-  #undef THERMAL_PROTECTION_BED
-  #undef THERMAL_PROTECTION_BED_PERIOD
-#endif
 #if ENABLED(THERMAL_PROTECTION_HOTENDS) && WATCH_TEMP_PERIOD > 0
   #define WATCH_HOTENDS 1
 #endif
@@ -3194,8 +3196,13 @@
 /**
  * Heater, Fan, and Probe interactions
  */
-#if !HAS_FAN
+#if !ALL(HAS_HOTEND, HAS_FAN)
   #undef ADAPTIVE_FAN_SLOWING
+#endif
+#if DISABLED(ADAPTIVE_FAN_SLOWING)
+  #undef REPORT_ADAPTIVE_FAN_SLOWING
+#endif
+#if DISABLED(ADAPTIVE_FAN_SLOWING) || NONE(MPCTEMP, PIDTEMP)
   #undef TEMP_TUNING_MAINTAIN_FAN
 #endif
 #if !ALL(HAS_BED_PROBE, HAS_FAN)
@@ -3512,6 +3519,8 @@
       #define LCD_WIDTH 21
     #elif IS_DWIN_MARLINUI
       // Defined by header
+    #elif HAS_GRAPHICAL_TFT
+      #define LCD_WIDTH ((TFT_WIDTH) / 16)
     #else
       #define LCD_WIDTH TERN(IS_ULTIPANEL, 20, 16)
     #endif
