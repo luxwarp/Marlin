@@ -28,7 +28,10 @@ def apply_opt(name, val, conf=None):
     # 7: Option value
     # 8: Whitespace after value
     # 9: End comment
-    regex = re.compile(rf'^(\s*)(//\s*)?(#define\s+)({name}\b)(\s?)(\s*)(.*?)(\s*)(//.*)?$', re.IGNORECASE)
+    regex = re.compile(
+        rf"^(\s*)(//\s*)?(#define\s+)({name}\b)(\s?)(\s*)(.*?)(\s*)(//.*)?$",
+        re.IGNORECASE
+    )
 
     # Find and enable and/or update all matches
     for file in ("Configuration.h", "Configuration_adv.h"):
@@ -264,7 +267,7 @@ if __name__ == "__main__":
         if args[0].endswith('.ini'):
             ini_file = args[0]
         else:
-            print("Usage: %s <.ini file>" % sys.argv[0])
+            print("Usage: %s <.ini file>" % os.path.basename(sys.argv[0]))
     else:
         ini_file = config_path('config.ini')
 
