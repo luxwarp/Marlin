@@ -125,7 +125,7 @@ static const uint8_t u8g_dev_sh1106_128x64_init_seq_2_wire[] PROGMEM = {
   CMD_OSC_FREQ(0, 8),       // Clock divide ratio (0:1) and oscillator frequency (8)
   CMD_CHARGE_PUMP(1),       // Charge pump setting
   CMD_SCROLL(0),            // Deactivate scroll
-  CMD_ON(1),                // Display on
+  CMD_ON(1),                // Display ON
   U8G_ESC_END               // End of sequence
 };
 
@@ -142,7 +142,7 @@ uint8_t u8g_dev_sh1106_128x64_2x_2_wire_fn(u8g_t *u8g, u8g_dev_t *dev, uint8_t m
       u8g_WriteEscSeqP_2_wire(u8g, dev, u8g_dev_sh1106_128x64_data_start_2_wire);
       u8g_WriteByte(u8g, dev, 0xB0 | (pb->p.page*2));   // Select current page
       u8g_SetAddress(u8g, dev, 1);                      // Data mode
-      u8g_WriteSequence(u8g, dev, pb->width, (uint8_t *) pb->buf);
+      u8g_WriteSequence(u8g, dev, pb->width, (uint8_t *)pb->buf);
       u8g_SetChipSelect(u8g, dev, 0);
       u8g_SetAddress(u8g, dev, 0);                      // Instruction mode
       u8g_WriteEscSeqP_2_wire(u8g, dev, u8g_dev_sh1106_128x64_data_start_2_wire);
@@ -170,15 +170,15 @@ static const uint8_t u8g_dev_ssd1306_128x64_data_start_2_wire[] PROGMEM = {
 
 static const uint8_t u8g_dev_ssd1306_128x64_init_seq_2_wire[] PROGMEM = {
   U8G_ESC_CS(0),            // Disable chip
-  CMD_ON(0),                // Display off, sleep mode
+  CMD_ON(0),                // Display OFF, sleep mode
   CMD_MUX_RATIO(0x3F),      // Mux ratio
   CMD_DISP_OFFS(0),         // Display offset
   CMD_START_LINE(0),        // Start line
   CMD_ADC_REVERSE(1),       // Segment remap A0/A1
   CMD_OUT_MODE(1),          // 0: scan dir normal, 1: reverse
-  CMD_COM_CONFIG(1),        // COM pin HW config, sequential com pin config (bit 4), disable left/right remap (bit 5)
+  CMD_COM_CONFIG(1),        // COM pin HW config, sequential COM pin config (bit 4), disable left/right remap (bit 5)
   CMD_CONTRAST(0xCF),       // Set contrast control
-  CMD_PAGE_ADR(0x02),       // page addressing mode
+  CMD_PAGE_ADR(2),          // Page addressing mode
   CMD_COLUMN_RANGE(0, 127), // Set column range 0 .. 127
   CMD_PAGE_RANGE(0, 7),     // Set page range from 0 .. 7
   CMD_CHARGE_PER(0x1, 0xF), // Pre-charge period
@@ -188,7 +188,7 @@ static const uint8_t u8g_dev_ssd1306_128x64_init_seq_2_wire[] PROGMEM = {
   CMD_OSC_FREQ(0, 8),       // Clock divide ratio (0:1) and oscillator frequency (8)
   CMD_CHARGE_PUMP(1),       // Charge pump setting
   CMD_SCROLL(0),            // Deactivate scroll
-  CMD_ON(1),                // Display on
+  CMD_ON(1),                // Display ON
   U8G_ESC_END               // End of sequence
 };
 
@@ -205,7 +205,7 @@ uint8_t u8g_dev_ssd1306_128x64_2x_2_wire_fn(u8g_t *u8g, u8g_dev_t *dev, uint8_t 
       u8g_WriteEscSeqP_2_wire(u8g, dev, u8g_dev_ssd1306_128x64_data_start_2_wire);
       u8g_WriteByte(u8g, dev, 0xB0 | (pb->p.page*2));   // Select current page
       u8g_SetAddress(u8g, dev, 1);                      // Data mode
-      u8g_WriteSequence(u8g, dev, pb->width, (uint8_t *) pb->buf);
+      u8g_WriteSequence(u8g, dev, pb->width, (uint8_t *)pb->buf);
       u8g_SetChipSelect(u8g, dev, 0);
       u8g_SetAddress(u8g, dev, 0);                      // Instruction mode
       u8g_WriteEscSeqP_2_wire(u8g, dev, u8g_dev_ssd1306_128x64_data_start_2_wire);
