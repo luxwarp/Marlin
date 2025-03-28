@@ -22,13 +22,43 @@
 #ifdef ARDUINO_ARCH_ESP32
 
 #include "../../inc/MarlinConfig.h"
+#include "./Hal.h"
 
 #include <rom/rtc.h>
-#include <driver/adc.h>
-#include <esp_adc_cal.h>
+// Change: For 5.1.4
+/*
+ * Note on ADC API selection (oneshot vs continuous):
+ *
+ * ESP-IDF 5.x provides two different ADC APIs:
+ * 
+ * 1. Oneshot ADC (esp_adc/adc_oneshot.h):
+ *    - Designed for occasional, on-demand readings
+ *    - Simple synchronous API with direct function calls
+ *    - Lower resource utilization (no DMA buffers or background tasks)
+ *    - Perfect for temperature monitoring where readings every ~100ms are sufficient
+ * 
+ * 2. Continuous ADC (esp_adc/adc_continuous.h):
+ *    - Designed for high-frequency sampling applications (audio, signal analysis)
+ *    - Uses DMA for continuous background sampling
+ *    - Requires callback handlers or event queues for data processing
+ *    - Higher resource utilization and more complex implementation
+ * 
+ * For 3D printer firmware like Marlin, the oneshot mode is ideal because:
+ *   - Temperature readings only need to happen periodically, not continuously
+ *   - Implementation is simpler and uses fewer resources
+ *   - Direct synchronous calls fit better with Marlin's architecture
+ *   - DMA and continuous sampling would be overkill for the application's needs
+ */
+#include <esp_adc/adc_oneshot.h>    // Change: For 5.1.4
+//#include <driver/adc.h>           // Change: For 5.1.4
+//#include <esp_adc_cal.h>          // Change: For 5.1.4
+#include <esp_adc/adc_cali.h>      // Change: For 5.1.4
+#include <esp_adc/adc_cali_scheme.h> // Change: For 5.1.4
+#include <driver/ledc.h> // Change: For 5.1.4
+
 #include <HardwareSerial.h>
 
-#if ENABLED(USE_ESP32_TASK_WDT)
+#if ENABLED(USE_WATCHDOG) // Change: Merge USE_WATCHDOG and USE_ESP32_TASK_WDT 
   #include <esp_task_wdt.h>
 #endif
 
@@ -48,6 +78,15 @@
   DefaultSerial1 MSerial0(false, Serial2Socket);
 #endif
 
+// Change : Add Serial 3 support
+#ifdef SERIAL_PORT_3
+  #if SERIAL_PORT_3 == 1
+    DefaultSerial3 MSerial2(false, Serial1);
+  #elif SERIAL_PORT_3 == 2
+    DefaultSerial3 MSerial2(false, Serial2);
+  #endif
+#endif // SERIAL_PORT_3
+
 // ------------------------
 // Externs
 // ------------------------
@@ -60,20 +99,32 @@ portMUX_TYPE MarlinHAL::spinlock = portMUX_INITIALIZER_UNLOCKED;
 
 #define V_REF 1100
 
+#ifndef ADC_REFERENCE_VOLTAGE
+  #define ADC_REFERENCE_VOLTAGE 3.3
+#endif
+
+// Change: For 5.1.4
+#define ADC_CHANNEL_MAX ((uint8_t)ADC_CHANNEL_9) + 1
+#define ADC_ATTEN_DB_MAX  ((uint8_t )ADC_ATTEN_DB_12) +1 
+
 // ------------------------
 // Public Variables
 // ------------------------
 
 uint16_t MarlinHAL::adc_result;
+adc_oneshot_unit_handle_t one_shot_adc_handle = NULL;
 pwm_pin_t MarlinHAL::pwm_pin_data[MAX_EXPANDER_BITS];
 
 // ------------------------
 // Private Variables
 // ------------------------
-
-esp_adc_cal_characteristics_t characteristics[ADC_ATTEN_MAX];
-adc_atten_t attenuations[ADC1_CHANNEL_MAX] = {};
-uint32_t thresholds[ADC_ATTEN_MAX];
+// Change: For 5.1.4
+//esp_adc_cal_characteristics_t characteristics[ADC_ATTENDB_MAX];
+//adc_atten_t attenuations[ADC1_CHANNEL_MAX] = {};
+//uint32_t thresholds[ADC_ATTENDB_MAX];
+adc_cali_handle_t characteristics[ADC_ATTEN_DB_MAX];
+adc_atten_t attenuations[ADC_CHANNEL_MAX] = {};
+uint32_t thresholds[ADC_ATTEN_DB_MAX];
 
 volatile int numPWMUsed = 0;
 volatile struct { pin_t pin; int value; } pwmState[MAX_PWM_PINS];
@@ -102,6 +153,16 @@ struct {
 
 #endif
 
+#if ENABLED(SDSUPPORT) && ENABLED(CUSTOM_SD_ACCESS)
+bool isSdUsed()
+{
+#if ENABLED(ESP3D_WIFISUPPORT)
+    return esp3dlib.isSdUsed();
+#endif
+    return false;
+}
+#endif
+
 #if ENABLED(USE_ESP32_EXIO)
 
   HardwareSerial YSerial2(2);
@@ -119,9 +180,6 @@ struct {
 #endif
 
 void MarlinHAL::init_board() {
-  #if ENABLED(USE_ESP32_TASK_WDT)
-    esp_task_wdt_init(10, true);
-  #endif
   #if ENABLED(ESP3D_WIFISUPPORT)
     esp3dlib.init();
   #elif ENABLED(WIFISUPPORT)
@@ -138,7 +196,6 @@ void MarlinHAL::init_board() {
   // The following code initializes hardware Serial1 and Serial2 to use user-defined pins
   // if they have been defined.
   #if defined(HARDWARE_SERIAL1_RX) && defined(HARDWARE_SERIAL1_TX)
-    HardwareSerial Serial1(1);
     #ifdef TMC_BAUD_RATE  // use TMC_BAUD_RATE for Serial1 if defined
       Serial1.begin(TMC_BAUD_RATE, SERIAL_8N1, HARDWARE_SERIAL1_RX, HARDWARE_SERIAL1_TX);
     #else  // use default BAUDRATE if TMC_BAUD_RATE not defined
@@ -186,22 +243,50 @@ int MarlinHAL::freeMemory() { return ESP.getFreeHeap(); }
 
 #if ENABLED(USE_WATCHDOG)
 
-  #define WDT_TIMEOUT_US TERN(WATCHDOG_DURATION_8S, 8000000, 4000000) // 4 or 8 second timeout
-
-  extern "C" {
-    esp_err_t esp_task_wdt_reset();
-  }
-
   void watchdogSetup() {
     // do whatever. don't remove this function.
   }
 
   void MarlinHAL::watchdog_init() {
-    // TODO
+    
+    // Configure the watchdog with 8 seconds timeout
+    esp_task_wdt_config_t wdt_config = {
+      .timeout_ms = 8000,
+      .idle_core_mask = 3,  // Watch both cores
+      .trigger_panic = true,
+    };
+    // Check if the current task is already subscribed to the watchdog
+    esp_err_t status = esp_task_wdt_status(NULL);
+     
+    if (status == ESP_OK) {
+      // Task is already subscribed to the watchdog
+      // No need to reinitialize or add the task
+      return;
+    }
+
+    if (status == ESP_ERR_NOT_FOUND){
+          // Current task is not subscribed to the watchdog
+          esp_task_wdt_add(NULL);
+          return;
+    }
+    
+    // Try to initialize the watchdog
+    esp_err_t init_err = esp_task_wdt_init(&wdt_config);
+    
+    if (init_err == ESP_OK) {
+      // Watchdog now exists, but current task is not subscribed
+      // Just add the current task without reinitializing
+      esp_task_wdt_add(NULL);
+    }
   }
 
   // Reset watchdog.
-  void MarlinHAL::watchdog_refresh() { esp_task_wdt_reset(); }
+  void MarlinHAL::watchdog_refresh() {
+    if (esp_task_wdt_status(NULL) == ESP_OK) {
+      esp_task_wdt_reset();
+    }
+    // Do nothing if the watchdog is not active or the current task is not subscribed
+  }
 
 #endif
 
@@ -209,84 +294,104 @@ int MarlinHAL::freeMemory() { return ESP.getFreeHeap(); }
 // ADC
 // ------------------------
 
-// https://docs.espressif.com/projects/esp-idf/en/release-v4.4/esp32/api-reference/peripherals/adc.html
-adc1_channel_t get_channel(int pin) {
-  switch (pin) {
-    case 39: return ADC1_CHANNEL_3;
-    case 36: return ADC1_CHANNEL_0;
-    case 35: return ADC1_CHANNEL_7;
-    case 34: return ADC1_CHANNEL_6;
-    case 33: return ADC1_CHANNEL_5;
-    case 32: return ADC1_CHANNEL_4;
-    case 37: return ADC1_CHANNEL_1;
-    case 38: return ADC1_CHANNEL_2;
-  }
-  return ADC1_CHANNEL_MAX;
+// Change: For 5.1.4
+adc_channel_t get_channel(int pin)
+{
+    switch (pin) {
+    case 39:
+        return ADC_CHANNEL_3;
+    case 36:
+        return ADC_CHANNEL_0;
+    case 35:
+        return ADC_CHANNEL_7;
+    case 34:
+        return ADC_CHANNEL_6;
+    case 33:
+        return ADC_CHANNEL_5;
+    case 32:
+        return ADC_CHANNEL_4;
+    }
+    return ADC_CHANNEL_9;
 }
 
-void adc1_set_attenuation(adc1_channel_t chan, adc_atten_t atten) {
+// Change: For 5.1.4
+void adc_set_attenuation(adc_channel_t chan, adc_atten_t atten) {
   if (attenuations[chan] != atten) {
-    adc1_config_channel_atten(chan, atten);
+    adc_oneshot_chan_cfg_t config = {
+      .atten = atten,
+      .bitwidth = ADC_BITWIDTH_12,
+    };
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(one_shot_adc_handle, chan, &config));
     attenuations[chan] = atten;
   }
 }
 
+// Change: For 5.1.4
 void MarlinHAL::adc_init() {
-  // Configure ADC
-  adc1_config_width(ADC_WIDTH_12Bit);
+  // Initialize ADC
+  adc_oneshot_unit_init_cfg_t init_config = {
+    .unit_id = ADC_UNIT_1,
+  };
+  ESP_ERROR_CHECK(adc_oneshot_new_unit(&init_config, &one_shot_adc_handle));
 
   // Configure channels only if used as (re-)configuring a pin for ADC that is used elsewhere might have adverse effects
-  TERN_(HAS_TEMP_ADC_0,        adc1_set_attenuation(get_channel(TEMP_0_PIN), ADC_ATTEN_11db));
-  TERN_(HAS_TEMP_ADC_1,        adc1_set_attenuation(get_channel(TEMP_1_PIN), ADC_ATTEN_11db));
-  TERN_(HAS_TEMP_ADC_2,        adc1_set_attenuation(get_channel(TEMP_2_PIN), ADC_ATTEN_11db));
-  TERN_(HAS_TEMP_ADC_3,        adc1_set_attenuation(get_channel(TEMP_3_PIN), ADC_ATTEN_11db));
-  TERN_(HAS_TEMP_ADC_4,        adc1_set_attenuation(get_channel(TEMP_4_PIN), ADC_ATTEN_11db));
-  TERN_(HAS_TEMP_ADC_5,        adc1_set_attenuation(get_channel(TEMP_5_PIN), ADC_ATTEN_11db));
-  TERN_(HAS_TEMP_ADC_6,        adc2_set_attenuation(get_channel(TEMP_6_PIN), ADC_ATTEN_11db));
-  TERN_(HAS_TEMP_ADC_7,        adc3_set_attenuation(get_channel(TEMP_7_PIN), ADC_ATTEN_11db));
-  TERN_(HAS_HEATED_BED,        adc1_set_attenuation(get_channel(TEMP_BED_PIN), ADC_ATTEN_11db));
-  TERN_(HAS_TEMP_CHAMBER,      adc1_set_attenuation(get_channel(TEMP_CHAMBER_PIN), ADC_ATTEN_11db));
-  TERN_(HAS_TEMP_PROBE,        adc1_set_attenuation(get_channel(TEMP_PROBE_PIN), ADC_ATTEN_11db));
-  TERN_(HAS_TEMP_COOLER,       adc1_set_attenuation(get_channel(TEMP_COOLER_PIN), ADC_ATTEN_11db));
-  TERN_(HAS_TEMP_BOARD,        adc1_set_attenuation(get_channel(TEMP_BOARD_PIN), ADC_ATTEN_11db));
-  TERN_(FILAMENT_WIDTH_SENSOR, adc1_set_attenuation(get_channel(FILWIDTH_PIN), ADC_ATTEN_11db));
+  TERN_(HAS_TEMP_ADC_0,        adc_set_attenuation(get_channel(TEMP_0_PIN), ADC_ATTEN_DB_12));
+  TERN_(HAS_TEMP_ADC_1,        adc_set_attenuation(get_channel(TEMP_1_PIN), ADC_ATTEN_DB_12));
+  TERN_(HAS_TEMP_ADC_2,        adc_set_attenuation(get_channel(TEMP_2_PIN), ADC_ATTEN_DB_12));
+  TERN_(HAS_TEMP_ADC_3,        adc_set_attenuation(get_channel(TEMP_3_PIN), ADC_ATTEN_DB_12));
+  TERN_(HAS_TEMP_ADC_4,        adc_set_attenuation(get_channel(TEMP_4_PIN), ADC_ATTEN_DB_12));
+  TERN_(HAS_TEMP_ADC_5,        adc_set_attenuation(get_channel(TEMP_5_PIN), ADC_ATTEN_DB_12));
+  TERN_(HAS_TEMP_ADC_6,        adc_set_attenuation(get_channel(TEMP_6_PIN), ADC_ATTEN_DB_12));
+  TERN_(HAS_TEMP_ADC_7,        adc_set_attenuation(get_channel(TEMP_7_PIN), ADC_ATTEN_DB_12));
+  TERN_(HAS_HEATED_BED,        adc_set_attenuation(get_channel(TEMP_BED_PIN), ADC_ATTEN_DB_12));
+  TERN_(HAS_TEMP_CHAMBER,      adc_set_attenuation(get_channel(TEMP_CHAMBER_PIN), ADC_ATTEN_DB_12));
+  TERN_(HAS_TEMP_PROBE,        adc_set_attenuation(get_channel(TEMP_PROBE_PIN), ADC_ATTEN_DB_12));
+  TERN_(HAS_TEMP_COOLER,       adc_set_attenuation(get_channel(TEMP_COOLER_PIN), ADC_ATTEN_DB_12));
+  TERN_(HAS_TEMP_BOARD,        adc_set_attenuation(get_channel(TEMP_BOARD_PIN), ADC_ATTEN_DB_12));
+  TERN_(FILAMENT_WIDTH_SENSOR, adc_set_attenuation(get_channel(FILWIDTH_PIN), ADC_ATTEN_DB_12));
+  
+  // Initialize calibration
+  for (int i = 0; i < ADC_ATTENDB_MAX; i++) {
+    adc_cali_line_fitting_config_t cali_config = {
+      .unit_id = ADC_UNIT_1,
+      .atten = (adc_atten_t)i,
+      .bitwidth = ADC_BITWIDTH_12,
+    };
+    ESP_ERROR_CHECK(adc_cali_create_scheme_line_fitting(&cali_config, &characteristics[i]));
+    
 
-  // Note that adc2 is shared with the WiFi module, which has higher priority, so the conversion may fail.
-  // That's why we're not setting it up here.
-
-  // Calculate ADC characteristics (i.e., gain and offset factors for each attenuation level)
-  for (int i = 0; i < ADC_ATTEN_MAX; i++) {
-    esp_adc_cal_characterize(ADC_UNIT_1, (adc_atten_t)i, ADC_WIDTH_BIT_12, V_REF, &characteristics[i]);
-
-    // Change attenuation 100mV below the calibrated threshold
-    thresholds[i] = esp_adc_cal_raw_to_voltage(4095, &characteristics[i]);
+    int raw_value = 4095; // Max value for 12 bits
+    int voltage_mv;
+    ESP_ERROR_CHECK(adc_cali_raw_to_voltage(characteristics[i], raw_value, &voltage_mv));
+    thresholds[i] = voltage_mv;
   }
 }
 
-#ifndef ADC_REFERENCE_VOLTAGE
-  #define ADC_REFERENCE_VOLTAGE 3.3
-#endif
 
+// Change: For 5.1.4
 void MarlinHAL::adc_start(const pin_t pin) {
-  const adc1_channel_t chan = get_channel(pin);
-  uint32_t mv;
-  esp_adc_cal_get_voltage((adc_channel_t)chan, &characteristics[attenuations[chan]], &mv);
+  const adc_channel_t chan = get_channel(pin);
+  int raw_value;
+  ESP_ERROR_CHECK(adc_oneshot_read(one_shot_adc_handle, chan, &raw_value));
+  
+  int voltage_mv;
+  ESP_ERROR_CHECK(adc_cali_raw_to_voltage(characteristics[attenuations[chan]], raw_value, &voltage_mv));
 
-  adc_result = mv * isr_float_t(1023) / isr_float_t(ADC_REFERENCE_VOLTAGE) / isr_float_t(1000);
+  adc_result = voltage_mv * isr_float_t(1023) / isr_float_t(ADC_REFERENCE_VOLTAGE) / isr_float_t(1000);
 
   // Change the attenuation level based on the new reading
   adc_atten_t atten;
-  if (mv < thresholds[ADC_ATTEN_DB_0] - 100)
+  if (voltage_mv < thresholds[ADC_ATTEN_DB_0] - 100)
     atten = ADC_ATTEN_DB_0;
-  else if (mv > thresholds[ADC_ATTEN_DB_0] - 50 && mv < thresholds[ADC_ATTEN_DB_2_5] - 100)
+  else if (voltage_mv > thresholds[ADC_ATTEN_DB_0] - 50 && voltage_mv < thresholds[ADC_ATTEN_DB_2_5] - 100)
     atten = ADC_ATTEN_DB_2_5;
-  else if (mv > thresholds[ADC_ATTEN_DB_2_5] - 50 && mv < thresholds[ADC_ATTEN_DB_6] - 100)
+  else if (voltage_mv > thresholds[ADC_ATTEN_DB_2_5] - 50 && voltage_mv < thresholds[ADC_ATTEN_DB_6] - 100)
     atten = ADC_ATTEN_DB_6;
-  else if (mv > thresholds[ADC_ATTEN_DB_6] - 50)
-    atten = ADC_ATTEN_DB_11;
+  else if (voltage_mv > thresholds[ADC_ATTEN_DB_6] - 50)
+    atten = ADC_ATTEN_DB_12;
   else return;
 
-  adc1_set_attenuation(chan, atten);
+  adc_set_attenuation(chan, atten);
 }
 
 // ------------------------
@@ -298,6 +403,31 @@ int8_t channel_for_pin(const uint8_t pin) {
     if (chan_pin[i] == pin) return i;
   return -1;
 }
+
+//Change: For IDF 5.1.4
+void ledcAttachPin(uint8_t pin, uint8_t channel) {
+  ledc_channel_config_t channel_config = {
+    .gpio_num = pin,
+    .speed_mode = LEDC_LOW_SPEED_MODE,
+    .channel = (ledc_channel_t)channel,
+    .timer_sel = (ledc_timer_t)(channel / 2),
+    .duty = 0,
+    .hpoint = 0
+  };
+  ESP_ERROR_CHECK(ledc_channel_config(&channel_config));
+}
+
+//Change: For IDF 5.1.4
+void ledcDetachPin(uint8_t pin) {
+  ESP_ERROR_CHECK(gpio_reset_pin((gpio_num_t)pin));
+}
+
+/*void ledcWrite(uint8_t channel, uint32_t duty) {
+  ESP_ERROR_CHECK(ledc_set_duty(LEDC_LOW_SPEED_MODE, channel, duty));
+  ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, channel));
+}*/
+
+
 
 // get PWM channel for pin - if none then attach a new one
 // return -1 if fail or invalid pin#, channel # (0-15) if success
@@ -325,7 +455,15 @@ int8_t get_pwm_channel(const pin_t pin, const uint32_t freq, const uint16_t res)
     chan_pin[cid] = pin;
     pwmInfo[cid / 2].freq = freq;
     pwmInfo[cid / 2].res = res;
-    ledcSetup(cid, freq, res);
+    // Change: For 5.1.4
+    ledc_timer_config_t timer_config = {
+      .speed_mode = LEDC_LOW_SPEED_MODE,
+      .duty_resolution = (ledc_timer_bit_t)res,
+      .timer_num = (ledc_timer_t)(cid / 2),
+      .freq_hz = freq,
+      .clk_cfg = LEDC_AUTO_CLK
+    };
+    ESP_ERROR_CHECK(ledc_timer_config(&timer_config));
     ledcAttachPin(pin, cid);
   }
   return cid; // -1 if no channel avail
@@ -365,7 +503,7 @@ int8_t MarlinHAL::set_pwm_frequency(const pin_t pin, const uint32_t f_desired) {
 
   const int8_t cid = channel_for_pin(pin);
   if (cid >= 0) {
-    if (f_desired == ledcReadFreq(cid)) return cid; // no freq change
+    if (f_desired == ledc_get_freq(LEDC_LOW_SPEED_MODE, (ledc_timer_t)(cid / 2))) return cid; // no freq change
     ledcDetachPin(chan_pin[cid]);
     chan_pin[cid] = 0;              // remove old freq channel
   }
@@ -399,7 +537,7 @@ void analogWrite(const pin_t pin, const uint16_t value, const uint32_t freq/*=PW
     // Start timer on first use
     if (idx == 0) HAL_timer_start(MF_TIMER_PWM, PWM_TIMER_FREQUENCY);
 
-    ++numPWMUsed;
+    numPWMUsed = numPWMUsed + 1; //Change: For IDF 5.1.4
   }
 
   // Use 7bit internal value - add 1 to have 100% high at 255

@@ -46,6 +46,42 @@ struct filepos_t {
   filepos_t() : position(0), cluster(0) {}
 };
 
+// Sanity to avoid framework conflicts
+// Change: For IDF 5.1.4
+#ifdef O_RDONLY
+  #undef O_RDONLY
+#endif
+#ifdef O_READ
+  #undef O_READ
+#endif
+#ifdef O_WRITE
+  #undef O_WRITE
+#endif
+#ifdef O_WRONLY
+  #undef O_WRONLY
+#endif
+#ifdef O_RDWR
+  #undef O_RDWR
+#endif
+#ifdef O_ACCMODE
+  #undef O_ACCMODE
+#endif
+#ifdef O_APPEND
+  #undef O_APPEND
+#endif
+#ifdef O_SYNC
+  #undef O_SYNC
+#endif
+#ifdef O_TRUNC
+  #undef O_TRUNC
+#endif
+#ifdef O_CREAT
+  #undef O_CREAT
+#endif
+#ifdef O_EXCL
+  #undef O_EXCL
+#endif
+
 // use the gnu style oflag in open()
 uint8_t const O_READ = 0x01,                    // open() oflag for reading
               O_RDONLY = O_READ,                // open() oflag - same as O_IN

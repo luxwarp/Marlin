@@ -32,17 +32,17 @@
 #define I2S_EXPANDER_PIN_INDEX(IO) (IO & 0x7F)
 
 // Set pin as input
-#define _SET_INPUT(IO)          pinMode(IO, INPUT)
+#define _SET_INPUT(IO)          (IO < 100 ?pinMode(IO, INPUT):void())
 
 // Set pin as output
-#define _SET_OUTPUT(IO)         pinMode(IO, OUTPUT)
+#define _SET_OUTPUT(IO)          (IO < 100 ?pinMode(IO, OUTPUT):void())
 
 // TODO: Store set modes in an array and use those to get the mode
 #define _IS_OUTPUT(IO)           true
 #define _IS_INPUT(IO)            true
 
 // Set pin as input with pullup mode
-#define _PULLUP(IO, v)          pinMode(IO, v ? INPUT_PULLUP : INPUT)
+#define _PULLUP(IO, v)          (IO < 100 ?pinMode(IO, v ? INPUT_PULLUP : INPUT):void())
 
 #if ENABLED(USE_ESP32_EXIO)
   // Read a pin wrapper

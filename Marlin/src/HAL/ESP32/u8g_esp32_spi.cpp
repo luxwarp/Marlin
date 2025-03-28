@@ -34,8 +34,8 @@
 
 #if HAS_MEDIA
   #include "../../sd/cardreader.h"
-  #if ENABLED(ESP3D_WIFISUPPORT)
-    #include "sd_ESP32.h"
+  #if ENABLED(CUSTOM_SD_ACCESS)
+   extern bool isSdUsed();
   #endif
 #endif
 
@@ -53,7 +53,12 @@ uint8_t u8g_esp32_hw_spi_fn(u8g_t *u8g, uint8_t msg, uint8_t arg_val, void *arg_
   static uint8_t msgInitCount = 2; // Ignore all messages until 2nd U8G_COM_MSG_INIT
 
   #if ENABLED(PAUSE_LCD_FOR_BUSY_SD)
-    if (card.flag.saving || card.flag.logging || TERN0(ESP3D_WIFISUPPORT, sd_busy_lock == true)) return 0;
+    if (card.flag.saving || card.flag.logging) return 0;
+   #if ENABLED(CUSTOM_SD_ACCESS)
+    if (isSdUsed()) {
+        return 0;
+    }
+   #endif //CUSTOM_SD_ACCESS
   #endif
 
   if (msgInitCount) {

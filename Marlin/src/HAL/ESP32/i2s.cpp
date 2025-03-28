@@ -28,7 +28,9 @@
 #include "i2s.h"
 
 #include "../shared/Marduino.h"
-#include <driver/periph_ctrl.h>
+#include <esp_private/periph_ctrl.h> // Change: For 5.1.4
+#include <soc/periph_defs.h> // Change: For 5.1.4
+#include <rom/gpio.h> // Change: For 5.1.4
 #include <rom/lldesc.h>
 #include <soc/i2s_struct.h>
 #include <freertos/queue.h>
@@ -68,9 +70,10 @@ uint32_t i2s_port_data = 0;
 #define I2S_EXIT_CRITICAL()   portEXIT_CRITICAL(&i2s_spinlock[i2s_num])
 
 static inline void gpio_matrix_out_check(uint32_t gpio, uint32_t signal_idx, bool out_inv, bool oen_inv) {
-  PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[gpio], PIN_FUNC_GPIO);
-  gpio_set_direction((gpio_num_t)gpio, (gpio_mode_t)GPIO_MODE_DEF_OUTPUT);
-  gpio_matrix_out(gpio, signal_idx, out_inv, oen_inv);
+  // Change: For 5.1.4
+  gpio_reset_pin((gpio_num_t)gpio);
+  gpio_set_direction((gpio_num_t)gpio, GPIO_MODE_OUTPUT);
+  gpio_matrix_out((gpio_num_t)gpio, signal_idx, out_inv, oen_inv);
 }
 
 static esp_err_t i2s_reset_fifo(i2s_port_t i2s_num) {

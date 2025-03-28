@@ -1,0 +1,82 @@
+Change log
+
+* esp32.ini
+    - use platform = https://github.com/pioarduino/platform-espressif32/releases/download/51.03.04/platform-espressif32.zip
+      ; Arduino  core 3.0.4 - IDF 5.1.4
+    - Remove platform_packages = espressif/toolchain-xtensa-esp32s3 as unecessary
+    - Remove because seems not necessary:
+      build_flags       = -std=gnu++17
+      build_unflags     = -std=gnu11 -std=gnu++11
+    - Add ecause of too many warnings:
+      build_flags       =  -Wno-volatile
+      Unfortunatly it raise a new warning because -Wno-volatile target all files, so C files and CPP files, may be add a command in prebuild :
+      `env.Append(CXXFLAGS=["-Wno-volatile"])`
+      But new warning is less painfull than all volatiles warnings
+    - Update upload baud rate to 115200 as default (suggested per vivian-ng for MRR_ESPA  and MRR_ESPE) like for PANDA
+    - Update monitor speed to 115200 as default
+    - Add flash size for each esp32 flash that is not 4MB
+    - Remove USE_ESP32_TASK_WDT as duplicate of USE_WATCHDOG 
+    - Sync all esp32 env 
+
+* features.ini
+    - Add ESP3D_WIFISUPPORT as separate entry to better discriminate libraries needs
+    - Add -DFILE_COPY_CONSTRUCTOR_SELECT=2 for ESP3DLib
+    - Add library : SDFat2=greiman/SdFat@2.2.3 
+    - Update Libraries : arduinoWebSockets=links2004/WebSockets@2.6.1,ESP32SSDP=https://github.com/luc-github/ESP32SSDP/archive/refs/tags/2.0.3.zip
+
+* Update sd/cardreader.cpp to support a new define `CUSTOM_SD_ACCESS` to allow concurrent SD access by external library by adding entries points in mount() and release()
+
+* Configuration_adv.h 
+   - Add #define CUSTOM_SD_ACCESS     // Enable another lib accessing the SD card without conflicts
+* Configuration.h 
+   - Add ESP32 as supported platform for a third serial in comments, so can use USB + ESP3D + Serial TFT
+
+* HAL/ESP32/HAL.h 
+   - Add SERIAL_PORT_3 feature support to ESP32
+* HAL.cpp 
+   - Update headers due to new APIs
+   - Update ADC API (use adc_oneshot)
+   - Add SERIAL_PORT_3 feature
+   - Add a new define `CUSTOM_SD_ACCESS` to allow concurrent SD access by external library
+   - Merge USE_ESP32_TASK_WDT and USE_WATCHDOG and only keep USE_WATCHDOG
+   - Remove unnecessary HardwareSerial Serial1(1); which conflict with TMC2209 setup
+   - Update for new PWM API
+   - Update for new ledc API
+   - Update code to avoid warnings
+* ota.cpp
+   - change WiFi.h header order, so no need to undef ENABLED/ DISABLED 
+* Tone.cpp
+   - Fix warning due to toggles-- vs toggles = toggles - 1
+* fastio.h
+   - Add sanity check for IO pins and pins mode function
+* i2s.cpp
+  - Update gpio_matrix_out_check due to new API
+* timers.h
+  - Update headers due to new API
+  - Update tTimerConfig due to new API
+* timers.cpp
+  - Update headers due to new API
+* u8g_esp32_spi.cpp 
+  - update to be more generic and no linked to ESP3D_WIFISUPPORT but to CUSTOM_SD_ACCESS
+
+* sd/SdBaseFile.h
+  - Add sanity check to avoid conflict with esp framework
+
+
+
+
+To control :
+
+* pins_MKS_TINYBEE.h
+Add `#define OLD_ADAPTIVE_MULTISTEPPING`
+
+* FYSETC_E4.h
+ `#define SKIP_TMC_SERIAL_BEGIN` 
+ fix Serial initialization error if using TMC2209 in uart mode because of multiple Serial initialization that is already done in HAL
+
+* MarlinCore.cpp
+
+ #if HAS_TMC220x && !defined(SKIP_TMC_SERIAL_BEGIN)
+    SETUP_RUN(tmc_serial_begin());
+  #endif
+

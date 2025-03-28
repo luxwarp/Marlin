@@ -60,6 +60,20 @@
   #define MYSERIAL2 webSocketSerial
 #endif
 
+#ifdef SERIAL_PORT_3
+  #if SERIAL_PORT_3 == 1
+    typedef ForwardSerial1Class< decltype(Serial1) > DefaultSerial3;
+    extern DefaultSerial3 MSerial2;
+    #define MYSERIAL3 MSerial2
+  #elif SERIAL_PORT_3 == 2
+    typedef ForwardSerial1Class< decltype(Serial2) > DefaultSerial3;
+    extern DefaultSerial3 MSerial2;
+    #define MYSERIAL3 MSerial2
+  #else
+    #error "SERIAL_PORT_3 must be from 1 to 2"
+  #endif
+#endif
+
 #define CRITICAL_SECTION_START() portENTER_CRITICAL(&hal.spinlock)
 #define CRITICAL_SECTION_END()   portEXIT_CRITICAL(&hal.spinlock)
 
