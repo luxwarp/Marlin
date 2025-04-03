@@ -62,13 +62,13 @@ Change log
 * sd/SdBaseFile.h
   - Add sanity check to avoid conflict with esp framework
 
-
+* pins_MKS_TINYBEE.h
+Add `#define OLD_ADAPTIVE_MULTISTEPPING` - Fix dead loop with timer
 
 
 To control :
 
-* pins_MKS_TINYBEE.h
-Add `#define OLD_ADAPTIVE_MULTISTEPPING`
+
 
 * FYSETC_E4.h
  `#define SKIP_TMC_SERIAL_BEGIN` 
@@ -80,3 +80,4 @@ Add `#define OLD_ADAPTIVE_MULTISTEPPING`
     SETUP_RUN(tmc_serial_begin());
   #endif
 
+* add Caps : WIFI=1
