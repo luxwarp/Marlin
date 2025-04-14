@@ -25,18 +25,28 @@
 #include "../../inc/MarlinConfigPre.h"
 
 #if ALL(WIFISUPPORT, OTASUPPORT)
-
+#undef _BV
+#undef DISABLED
 #include <WiFi.h>
 #include <ESPmDNS.h>
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
-#include <driver/timer.h>
+#include <driver/gptimer.h> // Change: For IDF 5.1.4
+#include "../shared/Delay.h"
+#include "timers.h" // Include this to access the timer_config array
 
 void OTA_init() {
   ArduinoOTA
     .onStart([]() {
-      timer_pause(TIMER_GROUP_0, TIMER_0);
-      timer_pause(TIMER_GROUP_0, TIMER_1);
+      // Change: For IDF 5.1.4
+      // Pause the stepper and temperature timers
+      // We need to stop the timers used by Marlin during OTA
+      if (timer_config[MF_TIMER_STEP].timer != NULL) {
+        ESP_ERROR_CHECK(gptimer_stop(timer_config[MF_TIMER_STEP].timer));
+      }
+      if (timer_config[MF_TIMER_TEMP].timer != NULL) {
+        ESP_ERROR_CHECK(gptimer_stop(timer_config[MF_TIMER_TEMP].timer));
+      }
 
       // U_FLASH or U_SPIFFS
       String type = (ArduinoOTA.getCommand() == U_FLASH) ? "sketch" : "filesystem";

@@ -57,7 +57,9 @@
   extern DefaultSerial1 MSerial0;
   #define MYSERIAL2 MSerial0
 #elif ENABLED(WIFISUPPORT)
-  #define MYSERIAL2 webSocketSerial
+  typedef ForwardSerial1Class< decltype(webSocketSerial) > DefaultSerial1;
+  extern DefaultSerial1 MSerial0;
+  #define MYSERIAL2 MSerial0
 #endif
 
 #ifdef SERIAL_PORT_3

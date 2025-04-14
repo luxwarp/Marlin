@@ -24,13 +24,14 @@
 #include "../../inc/MarlinConfigPre.h"
 
 #if ENABLED(WIFISUPPORT)
-
 #include "WebSocketSerial.h"
+#undef DISABLED
+#undef _BV
 #include "wifi.h"
 #include <ESPAsyncWebServer.h>
 
-MSerialWebSocketT webSocketSerial(false);
 AsyncWebSocket ws("/ws"); // TODO Move inside the class.
+WebSocketSerial webSocketSerial;
 
 // RingBuffer impl
 
@@ -136,6 +137,10 @@ size_t WebSocketSerial::write(const uint8_t c) {
 
   return ret;
 }
+
+
+WebSocketSerial::operator bool() const { return true; }
+
 
 size_t WebSocketSerial::write(const uint8_t *buffer, size_t size) {
   size_t written = 0;

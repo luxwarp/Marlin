@@ -21,7 +21,6 @@
  */
 #pragma once
 
-#include "../../inc/MarlinConfig.h"
 #include "../../core/serial_hook.h"
 
 #include <Stream.h>
@@ -65,6 +64,7 @@ public:
   WebSocketSerial();
   void begin(const long);
   void end();
+  operator bool() const;
   int available();
   int peek();
   int read();
@@ -72,14 +72,6 @@ public:
   size_t write(const uint8_t c);
   size_t write(const uint8_t *buffer, size_t size);
 
-  #if ENABLED(SERIAL_STATS_DROPPED_RX)
-    FORCE_INLINE uint32_t dropped() { return 0; }
-  #endif
-
-  #if ENABLED(SERIAL_STATS_MAX_RX_QUEUED)
-    FORCE_INLINE int rxMaxEnqueued() { return 0; }
-  #endif
 };
 
-typedef Serial1Class<WebSocketSerial> MSerialWebSocketT;
-extern MSerialWebSocketT webSocketSerial;
+extern WebSocketSerial webSocketSerial;

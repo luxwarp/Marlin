@@ -78,6 +78,10 @@
   DefaultSerial1 MSerial0(false, Serial2Socket);
 #endif
 
+#if ENABLED(WIFISUPPORT)
+  DefaultSerial1 MSerial0(false, webSocketSerial);
+#endif
+
 // Change : Add Serial 3 support
 #ifdef SERIAL_PORT_3
   #if SERIAL_PORT_3 == 1
