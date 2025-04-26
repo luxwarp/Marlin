@@ -197,6 +197,10 @@ void GcodeSuite::M115() {
       cap_line(F("MULTI_VOLUME"), ENABLED(HAS_MULTI_VOLUME));
     #endif
 
+    #if ENABLED(WIFISUPPORT) ||  ENABLED(ESP3D_WIFISUPPORT)
+    cap_line(F("WIFI"));
+    #endif
+
     // REPEAT (M808)
     cap_line(F("REPEAT"), ENABLED(GCODE_REPEAT_MARKERS));
 
