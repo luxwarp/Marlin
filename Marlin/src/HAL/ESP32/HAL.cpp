@@ -22,7 +22,7 @@
 #ifdef ARDUINO_ARCH_ESP32
 
 #include "../../inc/MarlinConfig.h"
-#include "./Hal.h"
+#include "./HAL.h"
 
 #include <rom/rtc.h>
 // Change: For 5.1.4
